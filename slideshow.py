@@ -45,7 +45,10 @@ class MySlideShow(tk.Toplevel):
         self.label = tk.Label(self)
         self.label.pack(side="top", fill="both", expand=True)
         self.label.configure(background='black')
+        self.label.configure(cursor='none')
 
+        scr_w, scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.wm_geometry("{}x{}+{}+{}".format(scr_w,scr_h,0,0))
         self.getImages()
         
         
@@ -54,24 +57,32 @@ class MySlideShow(tk.Toplevel):
         '''
         Get image directory from command line or use current directory
         '''
-        print("getting images...")
+        print("Getting images...")
     
         curr_dir = './images'
-
+        imageCounter = 0
         for root, dirs, files in os.walk(curr_dir):
             for f in files:
                 if f.endswith(".png") or f.endswith(".jpg"):
                     img_path = os.path.join(root, f)
-                    print(img_path)
+                    imageCounter += 1
+                    print imageCounter, " ", img_path
                     self.imageList.append(img_path)
 
-    def startSlideShow(self, delay=1): #delay in seconds
+        print("")
+
+
+    def startSlideShow(self, maxDelay=5): #delay in seconds
         myimage = random.choice(self.imageList) 
         # self.imageList[self.pixNum]
         # self.pixNum = (self.pixNum + 1) % len(self.imageList)
         self.showImage(myimage)
         #its like a callback function after n seconds (cycle through pics)
-        self.after(delay*1000, self.startSlideShow)
+        thisDelay = random.randrange(0, maxDelay, 1) #choose a random delay between 0 and maxDelay in seconds
+        print "  Waiting ", thisDelay, " seconds"
+        print ""
+        self.after(thisDelay*1000, self.startSlideShow)
+
 
     def showImage(self, filename):
         print "Showing image: " , filename
@@ -80,24 +91,20 @@ class MySlideShow(tk.Toplevel):
         img_w, img_h = image.size
         scr_w, scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
 
-        imgScale = max(float(scr_w)/float(img_w), float(scr_h)/float(img_h))
-        print "  image scale: " , imgScale
+        imgScale = min(float(scr_w)/float(img_w), float(scr_h)/float(img_h))
 
         width, height = min(scr_w, img_w), min(scr_h, img_h)
-        if imgScale > 0:
+        if imgScale < 1: #only scale down!
             width, height = img_w * imgScale, img_h * imgScale
         else:
-            print " WARNING imgscale " , imgScale
-        print "  screen size: " , scr_w , " x " , scr_h, "  image size: " , img_w , " x " , img_h
-        print "  scaled: " , width , " x ", height
+            print "  Not scaling "
+        
+        print "  Screen size: " , scr_w , " x " , scr_h
+        print "  Image size: " , img_w , " x " , img_h
+        print "  Scale factor: " , imgScale
+        print "  Scaled: " , width , " x ", height
 
         image.thumbnail((width, height), Image.ANTIALIAS) #resizes image, makes everything faster
-
-        #set window size after scaling the original image up/down to fit screen
-        #removes the border on the image
-        # scaled_w, scaled_h = image.size
-        # self.wm_geometry("{}x{}+{}+{}".format(scaled_w,scaled_h,0,0))
-        self.wm_geometry("{}x{}+{}+{}".format(scr_w,scr_h,0,0))
 
         # create new image 
         self.persistent_image = ImageTk.PhotoImage(image)
