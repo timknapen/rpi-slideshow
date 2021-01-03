@@ -17,23 +17,22 @@ You need to run the script from X-server, so either boot into the GUI or from th
 
 Put all images in a folder called "images"
 
-Run the slideshow:
-
-    python slideshow.py
-
-Press ESC to exit the slideshow
 
 
-# Pi3D version (slideshow_pi3D.py)
+
+# New to Pi3D version (slideshow_pi3D.py)
 
 See the full instructions at https://pi3d.github.io/html/ReadMe.html
 
-    $ sudo pip3 install pi3d 
+    sudo pip3 install pi3d 
   
 Set GPU memory to 128 in the raspberry config tool:
     
-    $ sudo raspi-config
+    sudo raspi-config
     
-Run the slideshow example:
+    
+Run the slideshow:
 
-    $ python slideshow_pi3D.py
+    python slideshow_pi3D.py
+
+Press ESC to exit the slideshow
