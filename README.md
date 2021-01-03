@@ -22,3 +22,18 @@ Run the slideshow:
     python slideshow.py
 
 Press ESC to exit the slideshow
+
+
+# Pi3D version (slideshow_pi3D.py)
+
+See the full instructions at https://pi3d.github.io/html/ReadMe.html
+
+    $ sudo pip3 install pi3d 
+  
+Set GPU memory to 128 in the raspberry config tool:
+    
+    $ sudo raspi-config
+    
+Run the slideshow example:
+
+    $ python slideshow_pi3D.py
