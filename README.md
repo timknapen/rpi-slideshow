@@ -15,10 +15,6 @@ You need to run the script from X-server, so either boot into the GUI or from th
     
     startx
 
-Put all images in a folder called `images`
-The `images` folder needs to be in the same folder as the script `slideshow.py`
-
-
 ## Pi3D
 
 See full instructions for pi3D at https://pi3d.github.io/html/ReadMe.html
@@ -29,9 +25,24 @@ Set GPU memory to 128 in the raspberry config tool:
     
     sudo raspi-config
     
+
+## This script
+
+Download this repository to your pi
+
+    wget https://github.com/timknapen/archive/rpi-slideshow/archive/master.zip
+
+And unzip it
+
+    unzip master.zip
+
+Put all images in the folder called `images` inside the repository
+(The `images` folder needs to stay in the same folder as the script `slideshow.py`)
+
     
 Run the slideshow:
 
     python slideshow.py
 
-Press ESC to exit the slideshow
+
+Press ESC to exit the slideshow.
