@@ -1,128 +1,185 @@
-'''
-Python 2.7 slideshow for Glenn
-modified from https://gist.github.com/terencewu/034e09f0e318c621516b
+#!/usr/bin/python
 
-All images must be dropped in a folder called ./images
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-Usage: python slideShow.py
-'''
+"""
+Based on the slideshow demo from PI3D https://pi3d.github.io
+"""
+import random, time, glob, threading
+import demo
+import pi3d
 
-import Tkinter as tk
-from PIL import Image, ImageTk
-import time
-import sys
-import os
-import random
+from six_mod.moves import queue
+
+print("press ESC to escape, S to go back, any key for next slide")
+
+# Setup display and initialise pi3d
+DISPLAY = pi3d.Display.create(background=(0.0, 0.0, 0.0, 1.0), frames_per_second=60)
+shader = pi3d.Shader("uv_flat")
+
+CAMERA = pi3d.Camera(is_3d=False)
+
+iFiles = glob.glob("images/*.jpg") # only jpg images
+nFi = len(iFiles)
+fileQ = queue.Queue() # queue for loading new texture files
+
+alpha_step = 0.025
+nSli = 8
+drawFlag = False
+autoPlay = True
+
+def tex_load():
+  
+  while True:
+    item = fileQ.get()
+
+    fname = item[0]
+    slide = item[1]
+
+    #tex = pi3d.Texture(item[0], mipmap=False) #pixelly but faster 3.3MB in 3s
+    tex = pi3d.Texture(item[0], blend=True, mipmap=True) #nicer but slower 3.3MB in 4.5s
+    xrat = DISPLAY.width/tex.ix
+    yrat = DISPLAY.height/tex.iy
+    if yrat < xrat:
+      xrat = yrat
+    wi, hi = tex.ix * xrat, tex.iy * xrat
+    slide.set_draw_details(shader,[tex])
+    slide.scale(wi, hi, 1.0)
+    slide.set_alpha(0)
+    fileQ.task_done()
 
 
-
-class HiddenRoot(tk.Tk):
-    def __init__(self):
-        tk.Tk.__init__(self)
-        #hackish way, essentially makes root window
-        #as small as possible but still "focused"
-        #enabling us to use the binding on <esc>
-        self.wm_geometry("0x0+0+0")
-
-        self.window = MySlideShow(self)
-        self.window.startSlideShow()
+class Slide(pi3d.Sprite):
+  def __init__(self):
+    super(Slide, self).__init__(w=1.0, h=1.0)
+    self.visible = False
+    self.fadeup = False
+    self.active = False
 
 
-class MySlideShow(tk.Toplevel):
-    def __init__(self, *args, **kwargs):
-        tk.Toplevel.__init__(self, *args, **kwargs)
+class Carousel:
+  def __init__(self):
+    self.slides = [None]*nSli
+    half = 0
+    for i in range(nSli):
+      self.slides[i] = Slide()
+    for i in range(nSli):
+      # never mind this, hop is just to fill in the first series of images from
+      # inside-out: 4 3 5 2 6 1 7 0.
+      half += (i%2)
+      step = (1,-1)[i%2]
+      hop = 4 + step*half
+
+      self.slides[hop].positionZ(0.8-(hop/10))
+      item = [iFiles[hop%nFi], self.slides[hop]]
+      fileQ.put(item)
+
+    self.focus = 3 # holds the index of the focused image
+    self.focus_fi = 0 # the file index of the focused image
+    self.slides[self.focus].visible = True
+    self.slides[self.focus].fadeup = True
+
+  def next(self):
+    self.slides[self.focus].fadeup = False
+    self.focus = (self.focus+1)%nSli
+    self.focus_fi = (self.focus_fi+1)%nFi
+    # the focused slide is set to z = 0.1.
+    # further away as i goes to the left (and wraps)
+    # print ('Focus: ' , self.slides[self.focus])
+    for i in range(nSli):
+      self.slides[(self.focus-i)%nSli].positionZ(0.1*i + 0.1)
+    self.slides[self.focus].fadeup = True
+    self.slides[self.focus].visible = True
+
+    fileName = iFiles[(self.focus_fi+4)%nFi]
+    item = [fileName, self.slides[(self.focus-4)%nSli]]
+    print('Loading: ', fileName)
+    fileQ.put(item)
+
+  def prev(self):
+    self.slides[self.focus].fadeup = False
+    self.focus = (self.focus-1)%nSli
+    self.focus_fi = (self.focus_fi-1)%nFi
+    for i in range(nSli):
+      self.slides[(self.focus-i)%nSli].positionZ(0.1*i + 0.1)
+    self.slides[self.focus].fadeup = True
+    self.slides[self.focus].visible = True
+
+    item = [iFiles[(self.focus_fi-3)%nFi], self.slides[(self.focus+5)%nSli]]
+    fileQ.put(item)
+
+  def update(self):
+    # for each slide check the fade direction, bump the alpha and clip
+    fadeDone = True
+    for i in range(nSli):
+      a = self.slides[i].alpha()
+      if self.slides[i].fadeup == True and a < 1:
+        a += alpha_step
+        self.slides[i].set_alpha(a)
+        self.slides[i].visible = True
+        self.slides[i].active = True
+        fadeDone = False # still fading
+      elif self.slides[i].fadeup == False and a > 0:
+        a -= alpha_step
+        self.slides[i].set_alpha(a)
+        self.slides[i].visible = True
+        self.slides[i].active = True
+        fadeDone = False # still fading
+      else:
+        if a <= 0:
+          self.slides[i].visible = False
+        self.slides[i].active = False
       
-        #remove window decorations 
-        self.overrideredirect(True)
-
-        #save reference to photo so that garbage collection
-        #does not clear image variable in show_image()
-        self.persistent_image = None
-        self.imageList = []
-        self.pixNum = 0
-
-        #used to display as background image
-        self.label = tk.Label(self)
-        self.label.pack(side="top", fill="both", expand=True)
-        self.label.configure(background='black')
-        self.label.configure(cursor='none')
-
-        scr_w, scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.wm_geometry("{}x{}+{}+{}".format(scr_w,scr_h,0,0))
-        self.getImages()
-        
-        
-
-    def getImages(self):
-        '''
-        Get image directory from command line or use current directory
-        '''
-        print("Getting images...")
-    
-        curr_dir = './images'
-        imageCounter = 0
-        for root, dirs, files in os.walk(curr_dir):
-            for f in files:
-                if f.endswith(".png") or f.endswith(".jpg"):
-                    img_path = os.path.join(root, f)
-                    imageCounter += 1
-                    print imageCounter, " ", img_path
-                    self.imageList.append(img_path)
-
-        print("")
+    if fadeDone and autoPlay:
+      self.next()
 
 
-    def startSlideShow(self, maxDelay=5): #delay in seconds
-        myimage = random.choice(self.imageList) 
-        # self.imageList[self.pixNum]
-        # self.pixNum = (self.pixNum + 1) % len(self.imageList)
-        self.showImage(myimage)
-        #its like a callback function after n seconds (cycle through pics)
-        thisDelay = random.randrange(0, maxDelay, 1) #choose a random delay between 0 and maxDelay in seconds
-        print "  Waiting ", thisDelay, " seconds"
-        print ""
-        self.after(thisDelay*1000, self.startSlideShow)
+  def draw(self):
+    # slides have to be drawn back to front for transparency to work.
+    # the 'focused' slide by definition at z=0.1, with deeper z
+    # trailing to the left.  So start by drawing the one to the right
+    # of 'focused', if it is set to visible.  It will be in the back.
+    for i in range(nSli):
+      ix = (self.focus+i+1)%nSli
+      if self.slides[ix].visible == True:
+        self.slides[ix].draw()
 
 
-    def showImage(self, filename):
-        print "Showing image: " , filename
-        image = Image.open(filename)  
+crsl = Carousel()
 
-        img_w, img_h = image.size
-        scr_w, scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
+t = threading.Thread(target=tex_load)
+t.daemon = True
+t.start()
 
-        imgScale = min(float(scr_w)/float(img_w), float(scr_h)/float(img_h))
+# block the world, for now, until all the initial textures are in.
+# later on, if the UI overruns the thread, there will be no crashola since the
+# old texture should still be there.
+fileQ.join()
 
-        width, height = min(scr_w, img_w), min(scr_h, img_h)
-        if imgScale < 1: #only scale down!
-            width, height = img_w * imgScale, img_h * imgScale
-        else:
-            print "  Not scaling "
-        
-        print "  Screen size: " , scr_w , " x " , scr_h
-        print "  Image size: " , img_w , " x " , img_h
-        print "  Scale factor: " , imgScale
-        print "  Scaled: " , width , " x ", height
-
-        image.thumbnail((width, height), Image.ANTIALIAS) #resizes image, makes everything faster
-
-        # create new image 
-        self.persistent_image = ImageTk.PhotoImage(image)
-        self.label.configure(image=self.persistent_image)
+# Fetch key presses
+mykeys = pi3d.Keyboard()
+CAMERA = pi3d.Camera.instance()
+CAMERA.was_moved = False #to save a tiny bit of work each loop
 
 
-if os.environ.get('DISPLAY','') == '':
-    print('no display found. Using :0.0')
-    os.environ.__setitem__('DISPLAY', ':0.0')
+while DISPLAY.loop_running():
+  crsl.update()
+  crsl.draw()
 
-'''
-#create main window
-master = tk.Tk()
-master.title("tester")
-master.geometry("300x100")
-'''
+  k = mykeys.read()
+  #k = -1
+  if k >-1:
+    first = False
+    d1, d2 = 2, 3
+    if k==27: #ESC
+      mykeys.close()
+      DISPLAY.stop()
+      break
+    if k==115: #S go back a picture
+      crsl.prev()
+    #all other keys load next picture
+    else:
+      crsl.next()
 
+DISPLAY.destroy()
 
-slideShow = HiddenRoot()
-slideShow.bind("<Escape>", lambda e: slideShow.destroy())  # exit on esc
-slideShow.mainloop()
