@@ -30,7 +30,7 @@ Set GPU memory to 128 in the raspberry config tool:
 
 Download this repository to your pi
 
-    wget https://github.com/timknapen/archive/rpi-slideshow/archive/master.zip
+    wget https://github.com/timknapen/rpi-slideshow/archive/master.zip
 
 And unzip it
 
