@@ -6,7 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 Based on the slideshow demo from PI3D https://pi3d.github.io
 """
 import random, time, glob, threading
-import demo
+import sys
+sys.path.insert(1, '/home/pi/pi3d')
 import pi3d
 
 from six_mod.moves import queue
